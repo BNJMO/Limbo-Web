@@ -1,6 +1,10 @@
 import { Application, Container, Text, TextStyle } from "pixi.js";
 
 const DEFAULT_BACKGROUND = 0x091b26;
+const MIN_MULTIPLIER = 1.01;
+const MIN_DISPLAY_MULTIPLIER = 1;
+const MAX_MULTIPLIER = 1_000_000;
+const HOUSE_EDGE = 0.99;
 
 function resolveRoot(mount) {
   const root = typeof mount === "string" ? document.querySelector(mount) : mount;
@@ -53,51 +57,113 @@ export async function createGame(mount, opts = {}) {
   const stage = new Container();
   app.stage.addChild(stage);
 
-  const statusText = new Text({
-    text: "Waiting for bet",
+  const outcomeText = new Text({
+    text: "1.00x",
     style: new TextStyle({
       fill: "#ffffff",
-      fontSize: 20,
+      fontSize: 72,
+      fontWeight: "700",
       fontFamily,
+      dropShadow: true,
+      dropShadowColor: "#000000",
+      dropShadowBlur: 8,
+      dropShadowDistance: 4,
     }),
   });
-  statusText.anchor.set(0.5);
-  stage.addChild(statusText);
+  outcomeText.anchor.set(0.5);
+  stage.addChild(outcomeText);
 
   const state = {
     roundActive: false,
     betAmount: 0,
     result: null,
+    displayedMultiplier: 1,
+    animation: null,
   };
+
+  function formatMultiplier(value) {
+    const precision = value >= 1000 ? 2 : value >= 10 ? 3 : 2;
+    return `${value.toFixed(precision)}x`;
+  }
+
+  function setOutcomeDisplay(value) {
+    const normalized = Math.max(
+      MIN_DISPLAY_MULTIPLIER,
+      Math.min(value, MAX_MULTIPLIER)
+    );
+    outcomeText.text = formatMultiplier(normalized);
+    state.displayedMultiplier = normalized;
+  }
+
+  function generateDemoMultiplier() {
+    const r = Math.random();
+    const raw = HOUSE_EDGE / (1 - r);
+    return Math.max(MIN_MULTIPLIER, Math.min(raw, MAX_MULTIPLIER));
+  }
+
+  function animateToMultiplier(target, { durationMs = 1000 } = {}) {
+    const start = performance.now();
+    const initial = state.displayedMultiplier ?? MIN_MULTIPLIER;
+    const clampedTarget = Math.max(MIN_MULTIPLIER, Math.min(target, MAX_MULTIPLIER));
+    const wasStopped = !app.ticker.started;
+
+    if (state.animation) {
+      app.ticker.remove(state.animation);
+      state.animation = null;
+    }
+
+    return new Promise((resolve) => {
+      const tick = () => {
+        const elapsed = performance.now() - start;
+        const t = Math.min(1, elapsed / durationMs);
+        const nextValue = initial + (clampedTarget - initial) * t;
+        setOutcomeDisplay(nextValue);
+        if (t >= 1) {
+          app.ticker.remove(tick);
+          state.animation = null;
+          if (wasStopped) {
+            app.ticker.stop();
+          }
+          resolve();
+        }
+      };
+
+      state.animation = tick;
+      if (wasStopped) {
+        app.ticker.start();
+      }
+      app.ticker.add(tick);
+    });
+  }
 
   function layout() {
     const { width, height } = measureRootSize(root, initialSize);
     app.renderer.resize(width, height);
-    statusText.position.set(width / 2, height / 2);
-  }
-
-  function updateStatus(message) {
-    statusText.text = message;
-  }
-
-  function startBet({ amount = 0 } = {}) {
-    state.roundActive = true;
-    state.betAmount = Number(amount) || 0;
-    state.result = null;
-    updateStatus(`Bet placed: ${state.betAmount}`);
-  }
-
-  function completeBet({ resultText = "Round complete" } = {}) {
-    state.roundActive = false;
-    state.result = resultText;
-    updateStatus(resultText);
+    outcomeText.position.set(width / 2, height / 2);
   }
 
   function reset() {
     state.roundActive = false;
     state.betAmount = 0;
     state.result = null;
-    updateStatus("Waiting for bet");
+    if (state.animation) {
+      app.ticker.remove(state.animation);
+      state.animation = null;
+    }
+    setOutcomeDisplay(1);
+  }
+
+  async function playDemoRound({ amount = 0 } = {}) {
+    state.roundActive = true;
+    state.betAmount = Number(amount) || 0;
+    state.result = null;
+
+    const resultMultiplier = generateDemoMultiplier();
+    await animateToMultiplier(resultMultiplier);
+
+    state.roundActive = false;
+    state.result = resultMultiplier;
+    return resultMultiplier;
   }
 
   function setAnimationsEnabled(enabled) {
@@ -122,8 +188,7 @@ export async function createGame(mount, opts = {}) {
     app,
     reset,
     destroy,
-    startBet,
-    completeBet,
+    playDemoRound,
     setAnimationsEnabled,
     getState: () => ({ ...state }),
   };

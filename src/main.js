@@ -20,26 +20,26 @@ function syncDisplays({ betAmount = 0, profitAmount = 0, multiplier = 1 }) {
 
 function resetRoundState() {
   roundActive = false;
-  controlPanel?.setBetButtonMode?.("bet");
+  controlPanel?.setBetButtonState?.("clickable");
   syncDisplays({ betAmount: controlPanel?.getBetValue?.() ?? 0, profitAmount: 0, multiplier: 1 });
   game?.reset?.();
 }
 
-function handleBetButtonClick() {
+async function handleBetButtonClick() {
   const betAmount = controlPanel?.getBetValue?.() ?? 0;
 
-  if (!roundActive) {
-    roundActive = true;
-    controlPanel?.setBetButtonMode?.("cashout");
-    syncDisplays({ betAmount, profitAmount: betAmount, multiplier: 1 });
-    game?.startBet?.({ amount: betAmount });
-    return;
-  }
+  if (roundActive) return;
 
-  roundActive = false;
-  controlPanel?.setBetButtonMode?.("bet");
-  game?.completeBet?.({ resultText: "Bet completed" });
+  roundActive = true;
+  controlPanel?.setBetButtonState?.("non-clickable");
   syncDisplays({ betAmount, profitAmount: betAmount, multiplier: 1 });
+
+  try {
+    await game?.playDemoRound?.({ amount: betAmount });
+  } finally {
+    roundActive = false;
+    controlPanel?.setBetButtonState?.("clickable");
+  }
 }
 
 function handleRandomPickClick() {
