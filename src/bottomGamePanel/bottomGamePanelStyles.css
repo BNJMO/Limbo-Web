@@ -133,7 +133,7 @@ button.game-panel-value:focus-visible {
   --game-panel-icon-height: 17px;
 }
 
-.bottom-panel-tooltip {
+.game-panel-value-tooltip {
   position: absolute;
   left: 50%;
   top: 0;
@@ -150,10 +150,10 @@ button.game-panel-value:focus-visible {
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
-  z-index: 1;
+  z-index: 5;
 }
 
-.bottom-panel-tooltip::after {
+.game-panel-value-tooltip::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -166,7 +166,7 @@ button.game-panel-value:focus-visible {
   border-top: 8px solid #f1f5ff;
 }
 
-.bottom-panel-tooltip.is-visible {
+.game-panel-value-tooltip.is-visible {
   opacity: 1;
   transform: translate(-50%, calc(-100% - 10px));
 }

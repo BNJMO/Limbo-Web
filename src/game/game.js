@@ -71,7 +71,7 @@ export async function createGame(mount, opts = {}) {
     text: "1.00x",
     style: new TextStyle({
       fill: "#ffffff",
-      fontSize: 72,
+      fontSize: 120,
       fontWeight: "700",
       fontFamily,
       dropShadow: true,

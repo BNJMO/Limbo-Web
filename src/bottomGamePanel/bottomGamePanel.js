@@ -145,6 +145,7 @@ function createValueBox({
   return {
     container,
     input,
+    valueWrapper,
     setValue,
     setClickable,
     setInvalid,
@@ -155,13 +156,6 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
   const host = resolveRoot(root ?? "#game");
   const panel = document.createElement("div");
   panel.className = "game-bottom-panel";
-
-  const tooltip = createTooltip({
-    className: "bottom-panel-tooltip",
-    visibleClass: "is-visible",
-    hideDelay: 3000,
-  });
-  panel.appendChild(tooltip.element);
 
   const state = {
     targetMultiplier: DEFAULT_TARGET_MULTIPLIER,
@@ -190,12 +184,24 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     return "";
   }
 
-  function setInvalidState({ target = "", winChance = "" }) {
-    targetBox.setInvalid(Boolean(target));
-    winChanceBox.setInvalid(Boolean(winChance));
-    const message = target || winChance;
-    if (message) {
-      tooltip.show(message);
+  function setInvalidState({ target = "", winChance = "" }, { showErrors = true } = {}) {
+    const targetMessage = target || "";
+    const winChanceMessage = winChance || "";
+    const anyInvalid = Boolean(targetMessage || winChanceMessage);
+
+    targetBox.setInvalid(anyInvalid);
+    winChanceBox.setInvalid(anyInvalid);
+
+    if (showErrors && targetMessage) {
+      targetTooltip.show(targetMessage);
+    } else {
+      targetTooltip.hide();
+    }
+
+    if (showErrors && winChanceMessage) {
+      winChanceTooltip.show(winChanceMessage);
+    } else {
+      winChanceTooltip.hide();
     }
   }
 
@@ -224,12 +230,10 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
       isSyncing = false;
     }
 
-    setInvalidState({ target: isValid ? "" : validationMessage });
+    setInvalidState({ target: isValid ? "" : validationMessage }, { showErrors });
 
     if (isValid && emit) {
       onValuesChange({ ...state });
-    } else if (showErrors && !isValid) {
-      tooltip.show(validationMessage);
     }
   }
 
@@ -263,12 +267,10 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
       isSyncing = false;
     }
 
-    setInvalidState({ winChance: isValid ? "" : validationMessage });
+    setInvalidState({ winChance: isValid ? "" : validationMessage }, { showErrors });
 
     if (isValid && emit) {
       onValuesChange({ ...state });
-    } else if (showErrors && !isValid) {
-      tooltip.show(validationMessage);
     }
   }
 
@@ -314,11 +316,31 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     iconClass: "game-panel-icon--win-chance",
   });
 
+  const targetTooltip = createTooltip({
+    className: "game-panel-value-tooltip",
+    visibleClass: "is-visible",
+    hideDelay: 3000,
+  });
+  targetBox.valueWrapper.appendChild(targetTooltip.element);
+
+  const winChanceTooltip = createTooltip({
+    className: "game-panel-value-tooltip",
+    visibleClass: "is-visible",
+    hideDelay: 3000,
+  });
+  winChanceBox.valueWrapper.appendChild(winChanceTooltip.element);
+
   targetBox.input.addEventListener("change", () => commitTarget(targetBox.input.value));
   winChanceBox.input.addEventListener("change", () => commitWinChance(winChanceBox.input.value));
 
-  targetBox.input.addEventListener("focus", () => tooltip.hide());
-  winChanceBox.input.addEventListener("focus", () => tooltip.hide());
+  targetBox.input.addEventListener("focus", () => {
+    targetTooltip.hide();
+    winChanceTooltip.hide();
+  });
+  winChanceBox.input.addEventListener("focus", () => {
+    targetTooltip.hide();
+    winChanceTooltip.hide();
+  });
 
   panel.append(targetBox.container, winChanceBox.container);
   host.appendChild(panel);
