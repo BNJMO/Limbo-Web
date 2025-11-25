@@ -1,5 +1,6 @@
 import { Application, Container, Text, TextStyle } from "pixi.js";
 import { createBetHistory } from "../betHistory/betHistory.js";
+import { playOutcomeRevealSound } from "../sound/soundManager.js";
 
 const DEFAULT_BACKGROUND = 0x091b26;
 const MIN_MULTIPLIER = 1.01;
@@ -193,6 +194,7 @@ export async function createGame(mount, opts = {}) {
     setOutcomeDisplay(1);
 
     const resultMultiplier = generateDemoMultiplier();
+    playOutcomeRevealSound();
     await animateToMultiplier(resultMultiplier);
 
     state.roundActive = false;
