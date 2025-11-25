@@ -205,6 +205,13 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     }
   }
 
+  function clearInvalidState() {
+    targetBox.setInvalid(false);
+    winChanceBox.setInvalid(false);
+    targetTooltip.hide();
+    winChanceTooltip.hide();
+  }
+
   function commitTarget(rawValue, { showErrors = true, emit = true } = {}) {
     const numeric = Number(sanitizeNumericInput(`${rawValue ?? ""}`));
     const rounded = Number.isFinite(numeric) ? roundToDecimals(numeric, 2) : NaN;
@@ -221,6 +228,7 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     targetBox.setValue(rounded);
 
     if (isValid) {
+      clearInvalidState();
       const derivedWinChance = roundToDecimals(
         computeWinChanceFromTarget(rounded),
         8
@@ -258,6 +266,7 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     winChanceBox.setValue(rounded);
 
     if (isValid) {
+      clearInvalidState();
       const derivedMultiplier = roundToDecimals(
         computeTargetFromWinChance(rounded),
         2
