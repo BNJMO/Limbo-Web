@@ -320,30 +320,6 @@
   transform: none;
 }
 
-.control-random-btn {
-  background: #223845;
-  color: #f5f6ff;
-  box-shadow: var(--control-elevation-shadow-strong);
-}
-
-.control-random-btn:hover {
-  background: #2b4a5a;
-  box-shadow: var(--control-elevation-shadow-hover);
-}
-
-.control-random-btn.is-non-clickable,
-.control-random-btn:disabled {
-  background: #1a2b35;
-  color: #4c5d68;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-.control-random-btn.is-non-clickable:hover,
-.control-random-btn:disabled:hover {
-  background: #101d26;
-}
-
 .control-profit-box {
   display: flex;
   align-items: center;
@@ -756,10 +732,6 @@
 
   #betBtn.control-bet-btn {
     order: -2;
-  }
-
-  .control-random-btn {
-    order: -1;
   }
 
   .control-bet-input-field {

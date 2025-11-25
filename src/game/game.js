@@ -5,6 +5,7 @@ const MIN_MULTIPLIER = 1.01;
 const MIN_DISPLAY_MULTIPLIER = 1;
 const MAX_MULTIPLIER = 1_000_000;
 const HOUSE_EDGE = 0.99;
+const DEFAULT_OUTCOME_COLOR = "#ffffff";
 
 function getRendererResolution() {
   if (typeof window === "undefined") {
@@ -70,7 +71,7 @@ export async function createGame(mount, opts = {}) {
   const outcomeText = new Text({
     text: "1.00x",
     style: new TextStyle({
-      fill: "#ffffff",
+      fill: DEFAULT_OUTCOME_COLOR,
       fontSize: 120,
       fontWeight: "700",
       fontFamily,
@@ -96,6 +97,10 @@ export async function createGame(mount, opts = {}) {
     return `${value.toFixed(precision)}x`;
   }
 
+  function setOutcomeColor(color = DEFAULT_OUTCOME_COLOR) {
+    outcomeText.style.fill = color;
+  }
+
   function setOutcomeDisplay(value) {
     const normalized = Math.max(
       MIN_DISPLAY_MULTIPLIER,
@@ -111,7 +116,7 @@ export async function createGame(mount, opts = {}) {
     return Math.max(MIN_MULTIPLIER, Math.min(raw, MAX_MULTIPLIER));
   }
 
-  function animateToMultiplier(target, { durationMs = 1000 } = {}) {
+  function animateToMultiplier(target, { durationMs = 500 } = {}) {
     const start = performance.now();
     const initial = state.displayedMultiplier ?? MIN_MULTIPLIER;
     const clampedTarget = Math.max(MIN_MULTIPLIER, Math.min(target, MAX_MULTIPLIER));
@@ -160,6 +165,7 @@ export async function createGame(mount, opts = {}) {
       app.ticker.remove(state.animation);
       state.animation = null;
     }
+    setOutcomeColor(DEFAULT_OUTCOME_COLOR);
     setOutcomeDisplay(1);
   }
 
@@ -168,6 +174,7 @@ export async function createGame(mount, opts = {}) {
     state.betAmount = Number(amount) || 0;
     state.result = null;
 
+    setOutcomeColor(DEFAULT_OUTCOME_COLOR);
     setOutcomeDisplay(1);
 
     const resultMultiplier = generateDemoMultiplier();
@@ -202,6 +209,7 @@ export async function createGame(mount, opts = {}) {
     destroy,
     playDemoRound,
     setAnimationsEnabled,
+    setOutcomeColor,
     getState: () => ({ ...state }),
   };
 }

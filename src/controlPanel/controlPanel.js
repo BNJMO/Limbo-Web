@@ -56,7 +56,6 @@ export class ControlPanel extends EventTarget {
 
     this.betButtonMode = "bet";
     this.betButtonState = "clickable";
-    this.randomPickButtonState = "clickable";
     this.minesSelectState = "clickable";
     this.autoStartButtonState = "non-clickable";
     this.autoStartButtonMode = "start";
@@ -299,7 +298,6 @@ export class ControlPanel extends EventTarget {
     this.scrollContainer.appendChild(this.manualSection);
 
     this.buildBetButton();
-    this.buildRandomPickButton();
     this.buildProfitOnWinDisplay();
     this.buildProfitDisplay();
 
@@ -625,20 +623,6 @@ export class ControlPanel extends EventTarget {
 
     this.setBetButtonMode(this.betButtonMode);
     this.setBetButtonState(this.betButtonState);
-  }
-
-  buildRandomPickButton() {
-    this.randomPickButton = document.createElement("button");
-    this.randomPickButton.type = "button";
-    this.randomPickButton.className = "control-bet-btn control-random-btn";
-    this.randomPickButton.textContent = "Random Pick";
-    this.randomPickButton.addEventListener("click", () => {
-      this.dispatchEvent(new CustomEvent("randompick"));
-    });
-    const parent = this.manualSection ?? this.scrollContainer;
-    parent.appendChild(this.randomPickButton);
-
-    this.setRandomPickState(this.randomPickButtonState);
   }
 
   refreshMinesOptions({ emit = true } = {}) {
@@ -1281,18 +1265,6 @@ export class ControlPanel extends EventTarget {
     const isClickable = normalized === "clickable";
     this.betButton.disabled = !isClickable;
     this.betButton.classList.toggle("is-non-clickable", !isClickable);
-  }
-
-  setRandomPickState(state) {
-    if (!this.randomPickButton) return;
-    const normalized =
-      state === "clickable" || state === true || state === "enabled"
-        ? "clickable"
-        : "non-clickable";
-    this.randomPickButtonState = normalized;
-    const isClickable = normalized === "clickable";
-    this.randomPickButton.disabled = !isClickable;
-    this.randomPickButton.classList.toggle("is-non-clickable", !isClickable);
   }
 
   setAutoStartButtonState(state) {

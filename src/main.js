@@ -56,6 +56,8 @@ async function handleBetButtonClick() {
     const result = await game?.playDemoRound?.({ amount: betAmount });
     const targetMultiplier = bottomPanel?.getTargetMultiplier?.() ?? 1;
     const isWin = Number(result) >= targetMultiplier;
+    const outcomeColor = isWin ? "#00E701" : "#E9113C";
+    game?.setOutcomeColor?.(outcomeColor);
     const netProfit = isWin
       ? betAmount * Math.max(0, targetMultiplier - 1)
       : -betAmount;
@@ -67,17 +69,12 @@ async function handleBetButtonClick() {
   }
 }
 
-function handleRandomPickClick() {
-  console.debug("Random pick requested - no game logic implemented yet.");
-}
-
 function handleStartAutobetClick() {
   console.debug("Auto bet toggle requested - no game logic implemented yet.");
 }
 
 function bindControlPanelEvents() {
   controlPanel.addEventListener("bet", handleBetButtonClick);
-  controlPanel.addEventListener("randompick", handleRandomPickClick);
   controlPanel.addEventListener("startautobet", handleStartAutobetClick);
   controlPanel.addEventListener("animationschange", (event) => {
     const enabled = Boolean(event.detail?.enabled);
