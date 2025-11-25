@@ -226,7 +226,12 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     winChanceTooltip.hide();
   }
 
-  function commitTarget(rawValue, { showErrors = true, emit = true } = {}) {
+  function commitTarget(
+    rawValue,
+    { showErrors = true, emit = true, allowSync = false } = {}
+  ) {
+    if (isSyncing && !allowSync) return;
+
     const numeric = Number(sanitizeNumericInput(`${rawValue ?? ""}`));
     const rounded = Number.isFinite(numeric) ? roundToDecimals(numeric, 2) : NaN;
 
@@ -243,13 +248,19 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
 
     if (isValid) {
       clearInvalidState();
-      const derivedWinChance = roundToDecimals(
-        computeWinChanceFromTarget(rounded),
-        8
-      );
-      isSyncing = true;
-      commitWinChance(derivedWinChance, { emit: false, allowSync: true, showErrors });
-      isSyncing = false;
+      if (!allowSync) {
+        const derivedWinChance = roundToDecimals(
+          computeWinChanceFromTarget(rounded),
+          8
+        );
+        isSyncing = true;
+        commitWinChance(derivedWinChance, {
+          emit: false,
+          allowSync: true,
+          showErrors,
+        });
+        isSyncing = false;
+      }
     }
 
     setInvalidState({ target: isValid ? "" : validationMessage }, { showErrors });
@@ -281,13 +292,19 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
 
     if (isValid) {
       clearInvalidState();
-      const derivedMultiplier = roundToDecimals(
-        computeTargetFromWinChance(rounded),
-        2
-      );
-      isSyncing = true;
-      commitTarget(derivedMultiplier, { emit: false, showErrors });
-      isSyncing = false;
+      if (!allowSync) {
+        const derivedMultiplier = roundToDecimals(
+          computeTargetFromWinChance(rounded),
+          2
+        );
+        isSyncing = true;
+        commitTarget(derivedMultiplier, {
+          emit: false,
+          allowSync: true,
+          showErrors,
+        });
+        isSyncing = false;
+      }
     }
 
     setInvalidState({ winChance: isValid ? "" : validationMessage }, { showErrors });
