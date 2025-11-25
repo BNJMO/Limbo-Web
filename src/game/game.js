@@ -7,9 +7,9 @@ const MIN_DISPLAY_MULTIPLIER = 1;
 const MAX_MULTIPLIER = 1_000_000;
 const HOUSE_EDGE = 0.99;
 const DEFAULT_OUTCOME_COLOR = "#ffffff";
-const OUTCOME_TEXT_VERTICAL_OFFSET = 0;
+const OUTCOME_TEXT_VERTICAL_OFFSET = -30;
 const OUTCOME_TEXT_BASE_SCALE = 1;
-const OUTCOME_TEXT_HEIGHT_MULTIPLIER = 1 / 400;
+const OUTCOME_TEXT_HEIGHT_MULTIPLIER = 0.0017;
 
 function getRendererResolution() {
   if (typeof window === "undefined") {
