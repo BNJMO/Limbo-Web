@@ -7,6 +7,7 @@ const MIN_DISPLAY_MULTIPLIER = 1;
 const MAX_MULTIPLIER = 1_000_000;
 const HOUSE_EDGE = 0.99;
 const DEFAULT_OUTCOME_COLOR = "#ffffff";
+const OUTCOME_TEXT_VERTICAL_OFFSET = 0;
 const OUTCOME_TEXT_BASE_SCALE = 1;
 const OUTCOME_TEXT_HEIGHT_MULTIPLIER = 1 / 400;
 
@@ -162,7 +163,7 @@ export async function createGame(mount, opts = {}) {
   function layout() {
     const { width, height } = measureRootSize(root, initialSize);
     app.renderer.resize(width, height);
-    outcomeText.position.set(width / 2, height / 2);
+    outcomeText.position.set(width / 2, height / 2 + OUTCOME_TEXT_VERTICAL_OFFSET);
     const scale = Math.min(
       OUTCOME_TEXT_BASE_SCALE,
       height * OUTCOME_TEXT_HEIGHT_MULTIPLIER
