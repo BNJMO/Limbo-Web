@@ -1,4 +1,5 @@
 import { Stepper } from "../stepper/stepper.js";
+import { createTooltip } from "../tooltip/tooltip.js";
 import bitcoinIconUrl from "../../assets/sprites/controlPanel/BitCoin.svg";
 import infinityIconUrl from "../../assets/sprites/controlPanel/Infinity.svg";
 import percentageIconUrl from "../../assets/sprites/controlPanel/Percentage.svg";
@@ -55,7 +56,6 @@ export class ControlPanel extends EventTarget {
 
     this.betButtonMode = "bet";
     this.betButtonState = "clickable";
-    this.randomPickButtonState = "clickable";
     this.minesSelectState = "clickable";
     this.autoStartButtonState = "non-clickable";
     this.autoStartButtonMode = "start";
@@ -63,8 +63,6 @@ export class ControlPanel extends EventTarget {
     this.showDummyServerButtonLocked = false;
 
     this.totalProfitMultiplier = 1;
-
-    this.betTooltipTimeout = null;
 
     const totalTilesOption = Number(this.options.totalTiles);
     const normalizedTotalTiles =
@@ -99,10 +97,6 @@ export class ControlPanel extends EventTarget {
     this.buildToggle();
     this.buildBetAmountDisplay();
     this.buildBetControls();
-    this.buildMinesLabel();
-    this.buildMinesSelect();
-    this.buildGemsLabel();
-    this.buildGemsDisplay();
     this.buildModeSections();
     this.buildFooter();
 
@@ -204,11 +198,11 @@ export class ControlPanel extends EventTarget {
     });
     this.betInputWrapper.appendChild(this.betStepper.element);
 
-    this.betTooltip = document.createElement("div");
-    this.betTooltip.className = "control-bet-tooltip";
-    this.betTooltip.setAttribute("role", "alert");
-    this.betTooltip.textContent = "This must be greater than or equal to 0";
-    this.betBox.appendChild(this.betTooltip);
+    this.betTooltip = createTooltip({
+      className: "control-bet-tooltip",
+      defaultMessage: "This must be greater than or equal to 0",
+    });
+    this.betBox.appendChild(this.betTooltip.element);
 
     this.halfButton = document.createElement("button");
     this.halfButton.type = "button";
@@ -304,7 +298,6 @@ export class ControlPanel extends EventTarget {
     this.scrollContainer.appendChild(this.manualSection);
 
     this.buildBetButton();
-    this.buildRandomPickButton();
     this.buildProfitOnWinDisplay();
     this.buildProfitDisplay();
 
@@ -632,20 +625,6 @@ export class ControlPanel extends EventTarget {
     this.setBetButtonState(this.betButtonState);
   }
 
-  buildRandomPickButton() {
-    this.randomPickButton = document.createElement("button");
-    this.randomPickButton.type = "button";
-    this.randomPickButton.className = "control-bet-btn control-random-btn";
-    this.randomPickButton.textContent = "Random Pick";
-    this.randomPickButton.addEventListener("click", () => {
-      this.dispatchEvent(new CustomEvent("randompick"));
-    });
-    const parent = this.manualSection ?? this.scrollContainer;
-    parent.appendChild(this.randomPickButton);
-
-    this.setRandomPickState(this.randomPickButtonState);
-  }
-
   refreshMinesOptions({ emit = true } = {}) {
     if (!this.minesSelect) return;
     const selected = Math.max(1, Math.min(this.currentMines, this.maxMines));
@@ -748,8 +727,7 @@ export class ControlPanel extends EventTarget {
 
   updateTotalProfitLabel() {
     if (!this.profitOnWinLabel) return;
-    const formattedMultiplier = this.totalProfitMultiplier.toFixed(2);
-    this.profitOnWinLabel.textContent = `Total Profit (${formattedMultiplier}x)`;
+    this.profitOnWinLabel.textContent = "Total Profit";
   }
 
   setTotalProfitMultiplier(value) {
@@ -1092,18 +1070,7 @@ export class ControlPanel extends EventTarget {
   }
 
   showBetAmountTooltip(message = "This must be greater than or equal to 0") {
-    if (!this.betTooltip) {
-      return;
-    }
-    this.betTooltip.textContent = message;
-    this.betTooltip.classList.add("is-visible");
-    if (this.betTooltipTimeout) {
-      clearTimeout(this.betTooltipTimeout);
-    }
-    this.betTooltipTimeout = setTimeout(() => {
-      this.betTooltip?.classList.remove("is-visible");
-      this.betTooltipTimeout = null;
-    }, 3000);
+    this.betTooltip?.show?.(message);
   }
 
   setBetInputValue(value, { emit = true } = {}) {
@@ -1283,11 +1250,9 @@ export class ControlPanel extends EventTarget {
 
   setBetButtonMode(mode) {
     if (!this.betButton) return;
-    const normalized = mode === "cashout" ? "cashout" : "bet";
-    this.betButtonMode = normalized;
-    this.betButton.textContent =
-      normalized === "cashout" ? "Cashout" : "Bet";
-    this.betButton.dataset.mode = normalized;
+    this.betButtonMode = "bet";
+    this.betButton.textContent = "Bet";
+    this.betButton.dataset.mode = "bet";
   }
 
   setBetButtonState(state) {
@@ -1300,18 +1265,6 @@ export class ControlPanel extends EventTarget {
     const isClickable = normalized === "clickable";
     this.betButton.disabled = !isClickable;
     this.betButton.classList.toggle("is-non-clickable", !isClickable);
-  }
-
-  setRandomPickState(state) {
-    if (!this.randomPickButton) return;
-    const normalized =
-      state === "clickable" || state === true || state === "enabled"
-        ? "clickable"
-        : "non-clickable";
-    this.randomPickButtonState = normalized;
-    const isClickable = normalized === "clickable";
-    this.randomPickButton.disabled = !isClickable;
-    this.randomPickButton.classList.toggle("is-non-clickable", !isClickable);
   }
 
   setAutoStartButtonState(state) {

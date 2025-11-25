@@ -1,8 +1,10 @@
 import { createGame } from "./game/game.js";
 import { ControlPanel } from "./controlPanel/controlPanel.js";
+import { createBottomGamePanel } from "./bottomGamePanel/bottomGamePanel.js";
 
 let game;
 let controlPanel;
+let bottomPanel;
 let roundActive = false;
 
 function formatCurrency(value) {
@@ -11,39 +13,70 @@ function formatCurrency(value) {
   return `$${normalized.toFixed(2)}`;
 }
 
+function formatMultiplierLabel(value) {
+  const numeric = Number(value);
+  const normalized = Number.isFinite(numeric) ? numeric : 0;
+  return `${normalized.toFixed(2)}x`;
+}
+
 function syncDisplays({ betAmount = 0, profitAmount = 0, multiplier = 1 }) {
+  const targetMultiplier = bottomPanel?.getTargetMultiplier?.() ?? 1;
+  const potentialProfit = betAmount * Math.max(0, targetMultiplier - 1);
   controlPanel?.setBetAmountDisplay?.(formatCurrency(betAmount));
-  controlPanel?.setProfitOnWinDisplay?.(formatCurrency(profitAmount));
+  controlPanel?.setProfitOnWinDisplay?.(formatCurrency(potentialProfit));
   controlPanel?.setTotalProfitMultiplier?.(multiplier);
-  controlPanel?.setProfitValue?.(profitAmount.toFixed(8));
+  const displayedProfit = Number.isFinite(profitAmount)
+    ? profitAmount
+    : potentialProfit;
+  controlPanel?.setProfitValue?.(displayedProfit.toFixed(8));
 }
 
 function resetRoundState() {
   roundActive = false;
-  controlPanel?.setBetButtonMode?.("bet");
-  syncDisplays({ betAmount: controlPanel?.getBetValue?.() ?? 0, profitAmount: 0, multiplier: 1 });
+  controlPanel?.setBetButtonState?.("clickable");
+  bottomPanel?.setControlsClickable?.(true);
+  syncDisplays({
+    betAmount: controlPanel?.getBetValue?.() ?? 0,
+    profitAmount: 0,
+    multiplier: 1,
+  });
   game?.reset?.();
 }
 
-function handleBetButtonClick() {
+async function handleBetButtonClick() {
   const betAmount = controlPanel?.getBetValue?.() ?? 0;
 
-  if (!roundActive) {
-    roundActive = true;
-    controlPanel?.setBetButtonMode?.("cashout");
-    syncDisplays({ betAmount, profitAmount: betAmount, multiplier: 1 });
-    game?.startBet?.({ amount: betAmount });
+  if (roundActive) return;
+
+  if (!bottomPanel?.isValid?.()) {
+    bottomPanel?.showValidationMessage?.();
     return;
   }
 
-  roundActive = false;
-  controlPanel?.setBetButtonMode?.("bet");
-  game?.completeBet?.({ resultText: "Bet completed" });
-  syncDisplays({ betAmount, profitAmount: betAmount, multiplier: 1 });
-}
+  roundActive = true;
+  controlPanel?.setBetButtonState?.("non-clickable");
+  bottomPanel?.setControlsClickable?.(false);
+  syncDisplays({ betAmount, profitAmount: 0, multiplier: 1 });
 
-function handleRandomPickClick() {
-  console.debug("Random pick requested - no game logic implemented yet.");
+  try {
+    const result = await game?.playDemoRound?.({ amount: betAmount });
+    const targetMultiplier = bottomPanel?.getTargetMultiplier?.() ?? 1;
+    const isWin = Number(result) >= targetMultiplier;
+    const outcomeColor = isWin ? "#00E701" : "#E9113C";
+    game?.setOutcomeColor?.(outcomeColor);
+    const netProfit = isWin
+      ? betAmount * Math.max(0, targetMultiplier - 1)
+      : -betAmount;
+    syncDisplays({ betAmount, profitAmount: netProfit, multiplier: targetMultiplier });
+    game?.addBetHistoryEntry?.({
+      label: formatMultiplierLabel(result),
+      isWin,
+    });
+  } finally {
+    roundActive = false;
+    controlPanel?.setBetButtonState?.("clickable");
+    bottomPanel?.setControlsClickable?.(true);
+  }
 }
 
 function handleStartAutobetClick() {
@@ -52,7 +85,6 @@ function handleStartAutobetClick() {
 
 function bindControlPanelEvents() {
   controlPanel.addEventListener("bet", handleBetButtonClick);
-  controlPanel.addEventListener("randompick", handleRandomPickClick);
   controlPanel.addEventListener("startautobet", handleStartAutobetClick);
   controlPanel.addEventListener("animationschange", (event) => {
     const enabled = Boolean(event.detail?.enabled);
@@ -74,10 +106,24 @@ function bindControlPanelEvents() {
   });
 
   bindControlPanelEvents();
-  syncDisplays({ betAmount: controlPanel.getBetValue?.() ?? 0, profitAmount: 0, multiplier: 1 });
+  syncDisplays({
+    betAmount: controlPanel.getBetValue?.() ?? 0,
+    profitAmount: 0,
+    multiplier: 1,
+  });
 
   game = await createGame("#game", {});
   game?.setAnimationsEnabled?.(controlPanel.getAnimationsEnabled?.());
+
+  bottomPanel = createBottomGamePanel({
+    root: "#game",
+    onValuesChange: () => {
+      const betAmount = controlPanel?.getBetValue?.() ?? 0;
+      if (!roundActive) {
+        syncDisplays({ betAmount, profitAmount: 0, multiplier: 1 });
+      }
+    },
+  });
 
   resetRoundState();
 })();

@@ -1,473 +1,423 @@
 import { Stepper } from "../stepper/stepper.js";
+import { createTooltip } from "../tooltip/tooltip.js";
 import multiplierIconUrl from "../../assets/sprites/MultiplierIcon.svg";
-import rollModeIconUrl from "../../assets/sprites/RollOverIcon.svg";
 import winChanceIconUrl from "../../assets/sprites/WinChanceIcon.svg";
 
-export function createBottomGamePanel({
-  root,
-  app,
-  appContainerElement,
-  sliderUi,
-  onSliderValueChange,
-  setHandleSliderChange = () => {},
+const DEFAULT_TARGET_MULTIPLIER = 2;
+const HOUSE_EDGE = 0.99;
+const MIN_TARGET_MULTIPLIER = 1.01;
+const MAX_TARGET_MULTIPLIER = 1_000_000;
+const MIN_WIN_CHANCE = 0.000099;
+const MAX_WIN_CHANCE = 98.01980198;
+
+function resolveRoot(root) {
+  const element = typeof root === "string" ? document.querySelector(root) : root;
+  if (!element) {
+    throw new Error("Bottom game panel mount element not found");
+  }
+  return element;
+}
+
+function formatTargetMultiplier(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "";
+}
+
+function formatWinChance(value) {
+  return Number.isFinite(value) ? value.toFixed(8) : "";
+}
+
+function sanitizeNumericInput(rawValue) {
+  if (typeof rawValue !== "string") return rawValue;
+  let sanitized = rawValue.replace(/[^0-9.]/g, "");
+  const dotIndex = sanitized.indexOf(".");
+  if (dotIndex !== -1) {
+    const before = sanitized.slice(0, dotIndex + 1);
+    const after = sanitized.slice(dotIndex + 1).replace(/\./g, "");
+    sanitized = `${before}${after}`;
+  }
+  return sanitized;
+}
+
+function sanitizeWinChanceInput(rawValue) {
+  const sanitized = sanitizeNumericInput(rawValue);
+  const dotIndex = typeof sanitized === "string" ? sanitized.indexOf(".") : -1;
+
+  if (dotIndex === -1 || typeof sanitized !== "string") {
+    return sanitized;
+  }
+
+  const before = sanitized.slice(0, dotIndex + 1);
+  const after = sanitized.slice(dotIndex + 1).slice(0, 8);
+
+  return `${before}${after}`;
+}
+
+function roundToDecimals(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function computeWinChanceFromTarget(target) {
+  return (HOUSE_EDGE * 100) / target;
+}
+
+function computeTargetFromWinChance(winChance) {
+  return (HOUSE_EDGE * 100) / winChance;
+}
+
+function createValueBox({
+  label,
+  icon,
+  step,
+  format,
+  sanitize,
+  onCommit,
+  ariaLabel,
+  iconClass = "",
 }) {
+  const container = document.createElement("div");
+  container.className = "game-panel-item";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "game-panel-label";
+  labelEl.textContent = label;
+  container.appendChild(labelEl);
+
+  const valueWrapper = document.createElement("div");
+  valueWrapper.className = "game-panel-value has-stepper";
+  container.appendChild(valueWrapper);
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "game-panel-input";
+  input.inputMode = "decimal";
+  input.spellcheck = false;
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", ariaLabel ?? label);
+  valueWrapper.appendChild(input);
+
+  const iconEl = document.createElement("img");
+  iconEl.src = icon;
+  iconEl.alt = "";
+  iconEl.className = "game-panel-icon";
+  if (iconClass) {
+    iconEl.classList.add(iconClass);
+  }
+  valueWrapper.appendChild(iconEl);
+
+  const stepper = new Stepper({
+    upAriaLabel: `Increase ${label}`,
+    downAriaLabel: `Decrease ${label}`,
+    onStepUp: () => onCommit?.("step-up", step),
+    onStepDown: () => onCommit?.("step-down", step),
+  });
+  valueWrapper.appendChild(stepper.element);
+
+  input.addEventListener("focus", () => {
+    setTimeout(() => input.select(), 0);
+  });
+
+  input.addEventListener("input", () => {
+    const sanitized = sanitize(input.value);
+    if (sanitized !== input.value) {
+      const selection = input.selectionStart ?? sanitized.length;
+      input.value = sanitized;
+      const newPos = Math.max(0, Math.min(sanitized.length, selection - 1));
+      try {
+        input.setSelectionRange(newPos, newPos);
+      } catch {}
+    }
+  });
+
+  input.addEventListener("blur", () => onCommit?.("commit", input.value));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onCommit?.("commit", input.value);
+      input.blur();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      input.blur();
+    }
+  });
+
+  function setValue(value) {
+    input.value = format(value);
+  }
+
+  function setClickable(isClickable) {
+    const clickable = Boolean(isClickable);
+    input.disabled = !clickable;
+    valueWrapper.classList.toggle("is-non-clickable", !clickable);
+    stepper?.setClickable?.(clickable);
+  }
+
+  function setInvalid(isInvalid) {
+    valueWrapper.classList.toggle("is-invalid", Boolean(isInvalid));
+  }
+
+  return {
+    container,
+    input,
+    valueWrapper,
+    setValue,
+    setClickable,
+    setInvalid,
+  };
+}
+
+export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) {
+  const host = resolveRoot(root ?? "#game");
   const panel = document.createElement("div");
   panel.className = "game-bottom-panel";
 
-  const portraitMediaQuery =
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia("(max-width: 768px), (orientation: portrait)")
-      : null;
-
-  let removePortraitModeWatcher = () => {};
-
-  function isPortraitMode() {
-    if (appContainerElement && typeof window !== "undefined") {
-      try {
-        const styles = window.getComputedStyle(appContainerElement);
-        if (styles?.flexDirection) {
-          const direction = `${styles.flexDirection}`.toLowerCase();
-          if (direction.includes("column")) {
-            return true;
-          }
-          if (direction.includes("row")) {
-            return false;
-          }
-        }
-      } catch {}
-
-      const rect = appContainerElement.getBoundingClientRect?.();
-      if (rect && rect.width > 0 && rect.height > 0) {
-        return rect.height >= rect.width;
-      }
-    }
-
-    if (portraitMediaQuery) {
-      return portraitMediaQuery.matches;
-    }
-
-    return false;
-  }
-
-  function formatPanelValue(value, defaultFormatter, fallback = "") {
-    if (!Number.isFinite(value)) {
-      return fallback;
-    }
-
-    if (isPortraitMode()) {
-      const preciseValue = Number(value);
-      if (Number.isFinite(preciseValue)) {
-        return preciseValue.toPrecision(4);
-      }
-    }
-
-    return defaultFormatter(value);
-  }
-
-  const notifySliderApplied = () => {
-    try {
-      onSliderValueChange(sliderUi.getValue());
-    } catch (err) {
-      console.warn("onSliderValueChange callback failed", err);
-    }
+  const state = {
+    targetMultiplier: DEFAULT_TARGET_MULTIPLIER,
+    winChance: computeWinChanceFromTarget(DEFAULT_TARGET_MULTIPLIER),
   };
 
-  function createEditableBox({
-    label,
-    icon,
-    iconClass = "",
-    step = 1,
-    getValue = () => NaN,
-    format = (value) => `${value ?? ""}`,
-    onCommit = () => {},
-    afterCommit = () => {},
-    allowDecimalOnly = false,
-  }) {
-    const container = document.createElement("div");
-    container.className = "game-panel-item";
+  let isSyncing = false;
 
-    const labelEl = document.createElement("span");
-    labelEl.className = "game-panel-label";
-    labelEl.textContent = label;
-    container.appendChild(labelEl);
-
-    const valueWrapper = document.createElement("div");
-    valueWrapper.className = "game-panel-value has-stepper";
-    container.appendChild(valueWrapper);
-
-    const input = document.createElement("input");
-    input.type = "text";
-    input.className = "game-panel-input";
-    input.inputMode = "decimal";
-    input.spellcheck = false;
-    input.autocomplete = "off";
-    input.setAttribute("aria-label", label);
-    valueWrapper.appendChild(input);
-
-    const iconEl = document.createElement("img");
-    iconEl.src = icon;
-    iconEl.alt = "";
-    iconEl.className = "game-panel-icon";
-    if (iconClass) {
-      iconEl.classList.add(iconClass);
+  function validateTarget(value) {
+    if (value < MIN_TARGET_MULTIPLIER) {
+      return `Minimum is "${MIN_TARGET_MULTIPLIER.toFixed(2)}"`;
     }
-    valueWrapper.appendChild(iconEl);
-
-    const stepper = new Stepper({
-      upAriaLabel: `Increase ${label}`,
-      downAriaLabel: `Decrease ${label}`,
-      onStepUp: () => {
-        const current = Number(getValue());
-        const next = Number.isFinite(current) ? current + step : step;
-        onCommit(next);
-        afterCommit(next);
-        refresh(true);
-      },
-      onStepDown: () => {
-        const current = Number(getValue());
-        const next = Number.isFinite(current) ? current - step : 0;
-        onCommit(next);
-        afterCommit(next);
-        refresh(true);
-      },
-    });
-
-    valueWrapper.appendChild(stepper.element);
-
-    const state = { editing: false };
-
-    function sanitizeDecimalString(rawValue) {
-      if (typeof rawValue !== "string") {
-        return "";
-      }
-      let sanitized = rawValue.replace(/[^0-9.]/g, "");
-      const dotIndex = sanitized.indexOf(".");
-      if (dotIndex !== -1) {
-        const before = sanitized.slice(0, dotIndex + 1);
-        const after = sanitized.slice(dotIndex + 1).replace(/\./g, "");
-        sanitized = `${before}${after}`;
-      }
-      return sanitized;
+    if (value > MAX_TARGET_MULTIPLIER) {
+      return `Maximum is "${MAX_TARGET_MULTIPLIER.toFixed(0)}"`;
     }
-
-    function refresh(force = false) {
-      if (state.editing && !force) return;
-      const value = getValue();
-      if (Number.isFinite(value)) {
-        input.value = format(value);
-      } else {
-        input.value = "";
-      }
-    }
-
-    function commit() {
-      const raw = input.value.trim();
-      if (!raw) {
-        refresh(true);
-        return;
-      }
-      const numeric = Number(raw);
-      if (Number.isFinite(numeric)) {
-        onCommit(numeric);
-        afterCommit(numeric);
-      }
-      refresh(true);
-    }
-
-    input.addEventListener("focus", () => {
-      state.editing = true;
-      setTimeout(() => input.select(), 0);
-    });
-
-    input.addEventListener("blur", () => {
-      state.editing = false;
-      commit();
-    });
-
-    input.addEventListener("input", () => {
-      if (!allowDecimalOnly) return;
-      const raw = input.value;
-      const selection = input.selectionStart ?? raw.length;
-      const sanitized = sanitizeDecimalString(raw);
-      if (sanitized !== raw) {
-        const delta = raw.length - sanitized.length;
-        input.value = sanitized;
-        const newPos = Math.max(0, selection - delta);
-        try {
-          input.setSelectionRange(newPos, newPos);
-        } catch {}
-      }
-    });
-
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        state.editing = false;
-        commit();
-        input.blur();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        state.editing = false;
-        refresh(true);
-        input.blur();
-      } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-        event.preventDefault();
-        const direction = event.key === "ArrowUp" ? 1 : -1;
-        const current = Number(getValue());
-        const next = Number.isFinite(current)
-          ? current + direction * step
-          : direction * step;
-        onCommit(next);
-        afterCommit(next);
-        refresh(true);
-      }
-    });
-
-    valueWrapper.addEventListener("click", () => input.focus());
-
-    function setClickable(isClickable) {
-      const clickable = Boolean(isClickable);
-      input.disabled = !clickable;
-      valueWrapper.classList.toggle("is-non-clickable", !clickable);
-      stepper?.setClickable?.(clickable);
-    }
-
-    return {
-      container,
-      refresh,
-      setClickable,
-    };
+    return "";
   }
 
-  function createRollModeBox() {
-    const container = document.createElement("div");
-    container.className = "game-panel-item";
+  function validateWinChance(value) {
+    if (value < MIN_WIN_CHANCE) {
+      return `Minimum is "${MIN_WIN_CHANCE}"`;
+    }
+    if (value > MAX_WIN_CHANCE) {
+      return `Maximum is "${MAX_WIN_CHANCE}"`;
+    }
+    return "";
+  }
 
-    const labelEl = document.createElement("span");
-    labelEl.className = "game-panel-label";
-    container.appendChild(labelEl);
+  function setInvalidState({ target = "", winChance = "" }, { showErrors = true } = {}) {
+    const targetMessage = target || "";
+    const winChanceMessage = winChance || "";
+    const anyInvalid = Boolean(targetMessage || winChanceMessage);
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "game-panel-value game-panel-toggle";
-    button.setAttribute("aria-label", "Toggle roll mode");
-    container.appendChild(button);
+    targetBox.setInvalid(anyInvalid);
+    winChanceBox.setInvalid(anyInvalid);
 
-    const valueEl = document.createElement("span");
-    valueEl.className = "game-panel-display";
-    button.appendChild(valueEl);
+    if (showErrors && targetMessage) {
+      targetTooltip.show(targetMessage);
+    } else {
+      targetTooltip.hide();
+    }
 
-    const iconEl = document.createElement("img");
-    iconEl.src = rollModeIconUrl;
-    iconEl.alt = "";
-    iconEl.className = "game-panel-icon";
-    iconEl.classList.add("game-panel-icon--roll-mode");
-    button.appendChild(iconEl);
+    if (showErrors && winChanceMessage) {
+      winChanceTooltip.show(winChanceMessage);
+    } else {
+      winChanceTooltip.hide();
+    }
+  }
 
-    button.addEventListener("click", () => {
-      sliderUi.toggleRollMode();
-      refresh(true);
-      notifySliderApplied();
-    });
+  function clearInvalidState() {
+    targetBox.setInvalid(false);
+    winChanceBox.setInvalid(false);
+    targetTooltip.hide();
+    winChanceTooltip.hide();
+  }
 
-    function refresh(force = false) {
-      const mode = sliderUi.getRollMode();
-      labelEl.textContent = mode === "under" ? "Roll Under" : "Roll Over";
-      button.setAttribute("data-mode", mode);
-      const value = sliderUi.getValue();
-      if (force || document.activeElement !== button) {
-        const fallbackValue = formatPanelValue(NaN, (v) => v.toFixed(2), "0.00");
-        valueEl.textContent = Number.isFinite(value)
-          ? formatPanelValue(value, (v) => v.toFixed(2), fallbackValue)
-          : fallbackValue;
+  function commitTarget(
+    rawValue,
+    { showErrors = true, emit = true, allowSync = false } = {}
+  ) {
+    if (isSyncing && !allowSync) return;
+
+    const numeric = Number(sanitizeNumericInput(`${rawValue ?? ""}`));
+    const rounded = Number.isFinite(numeric) ? roundToDecimals(numeric, 2) : NaN;
+
+    if (!Number.isFinite(rounded)) {
+      targetBox.setValue(state.targetMultiplier);
+      return;
+    }
+
+    const validationMessage = validateTarget(rounded);
+    const isValid = !validationMessage;
+
+    state.targetMultiplier = rounded;
+    targetBox.setValue(rounded);
+
+    if (isValid) {
+      clearInvalidState();
+      if (!allowSync) {
+        const derivedWinChance = roundToDecimals(
+          computeWinChanceFromTarget(rounded),
+          8
+        );
+        isSyncing = true;
+        commitWinChance(derivedWinChance, {
+          emit: false,
+          allowSync: true,
+          showErrors,
+        });
+        isSyncing = false;
       }
     }
 
-    function setClickable(isClickable) {
-      const clickable = Boolean(isClickable);
-      button.disabled = !clickable;
-      button.classList.toggle("is-non-clickable", !clickable);
-    }
+    setInvalidState({ target: isValid ? "" : validationMessage }, { showErrors });
 
-    return {
-      container,
-      refresh,
-      setClickable,
-    };
+    if (isValid && emit) {
+      onValuesChange({ ...state });
+    }
   }
 
-  const multiplierBox = createEditableBox({
-    label: "Multiplier",
+  function commitWinChance(
+    rawValue,
+    { emit = true, allowSync = false, showErrors = true } = {}
+  ) {
+    if (isSyncing && !allowSync) return;
+
+    const numeric = Number(sanitizeWinChanceInput(`${rawValue ?? ""}`));
+    const rounded = Number.isFinite(numeric) ? roundToDecimals(numeric, 8) : NaN;
+
+    if (!Number.isFinite(rounded)) {
+      winChanceBox.setValue(state.winChance);
+      return;
+    }
+
+    const validationMessage = validateWinChance(rounded);
+    const isValid = !validationMessage;
+
+    state.winChance = rounded;
+    winChanceBox.setValue(rounded);
+
+    if (isValid) {
+      clearInvalidState();
+      if (!allowSync) {
+        const derivedMultiplier = roundToDecimals(
+          computeTargetFromWinChance(rounded),
+          2
+        );
+        isSyncing = true;
+        commitTarget(derivedMultiplier, {
+          emit: false,
+          allowSync: true,
+          showErrors,
+        });
+        isSyncing = false;
+      }
+    }
+
+    setInvalidState({ winChance: isValid ? "" : validationMessage }, { showErrors });
+
+    if (isValid && emit) {
+      onValuesChange({ ...state });
+    }
+  }
+
+  function handleTargetCommit(type, value) {
+    if (type === "step-up") {
+      commitTarget(state.targetMultiplier + value);
+    } else if (type === "step-down") {
+      commitTarget(state.targetMultiplier - value);
+    } else {
+      commitTarget(value);
+    }
+  }
+
+  function handleWinChanceCommit(type, value) {
+    if (type === "step-up") {
+      commitWinChance(state.winChance + value);
+    } else if (type === "step-down") {
+      commitWinChance(state.winChance - value);
+    } else {
+      commitWinChance(value);
+    }
+  }
+
+  const targetBox = createValueBox({
+    label: "Target Multiplier",
     icon: multiplierIconUrl,
+    step: 0.01,
+    format: formatTargetMultiplier,
+    sanitize: (value) => sanitizeNumericInput(`${value ?? ""}`),
+    ariaLabel: "Target Multiplier",
+    onCommit: handleTargetCommit,
     iconClass: "game-panel-icon--multiplier",
-    step: 1,
-    getValue: () => sliderUi.getMultiplier(),
-    format: (value) => formatPanelValue(value, (v) => v.toFixed(4)),
-    onCommit: (value) => sliderUi.setMultiplier(value),
-    afterCommit: notifySliderApplied,
   });
 
-  const rollModeBox = createRollModeBox();
-
-  const winChanceBox = createEditableBox({
+  const winChanceBox = createValueBox({
     label: "Win Chance",
     icon: winChanceIconUrl,
+    step: 0.01,
+    format: formatWinChance,
+    sanitize: (value) => sanitizeWinChanceInput(`${value ?? ""}`),
+    ariaLabel: "Win Chance",
+    onCommit: handleWinChanceCommit,
     iconClass: "game-panel-icon--win-chance",
-    step: 1,
-    getValue: () => sliderUi.getWinChance(),
-    format: (value) => formatPanelValue(value, (v) => v.toFixed(4)),
-    onCommit: (value) => sliderUi.setWinChance(value),
-    afterCommit: notifySliderApplied,
-    allowDecimalOnly: true,
   });
 
-  panel.append(multiplierBox.container, rollModeBox.container, winChanceBox.container);
+  const targetTooltip = createTooltip({
+    className: "game-panel-value-tooltip",
+    visibleClass: "is-visible",
+    hideDelay: 3000,
+  });
+  targetBox.valueWrapper.appendChild(targetTooltip.element);
 
-  root.appendChild(panel);
+  const winChanceTooltip = createTooltip({
+    className: "game-panel-value-tooltip",
+    visibleClass: "is-visible",
+    hideDelay: 3000,
+  });
+  winChanceBox.valueWrapper.appendChild(winChanceTooltip.element);
 
-  const SCALE_EPSILON = 0.0001;
-  let appliedScale = 1;
-  let lastScaledHeight = 0;
-  let lastIsPortrait = isPortraitMode();
+  targetBox.input.addEventListener("change", () => commitTarget(targetBox.input.value));
+  winChanceBox.input.addEventListener("change", () => commitWinChance(winChanceBox.input.value));
 
-  function layout() {
-    let desiredScale = 1;
+  targetBox.input.addEventListener("focus", () => {
+    targetTooltip.hide();
+    winChanceTooltip.hide();
+  });
+  winChanceBox.input.addEventListener("focus", () => {
+    targetTooltip.hide();
+    winChanceTooltip.hide();
+  });
 
-    const panelContentWidth = Number(panel.scrollWidth);
-    const parentWidth = Number(
-      panel.parentElement?.clientWidth ??
-        panel.parentElement?.offsetWidth ??
-        app?.renderer?.width ??
-        0
-    );
-    const horizontalPadding = 40;
-    const maxPanelWidth =
-      Number.isFinite(parentWidth) && parentWidth > 0
-        ? Math.max(0, parentWidth - horizontalPadding)
-        : 0;
+  panel.append(targetBox.container, winChanceBox.container);
+  host.appendChild(panel);
 
-    if (Number.isFinite(panelContentWidth) && panelContentWidth > 0 && maxPanelWidth > 0) {
-      const widthScale = Math.min(1, maxPanelWidth / panelContentWidth);
-      desiredScale = Math.min(desiredScale, widthScale);
-    }
+  targetBox.setValue(state.targetMultiplier);
+  winChanceBox.setValue(state.winChance);
 
-    if (!Number.isFinite(desiredScale) || desiredScale <= 0) {
-      desiredScale = 1;
-    }
-
-    const previousScale = appliedScale;
-    appliedScale = Math.max(0, Math.min(1, desiredScale));
-    const scaleChanged = Math.abs(appliedScale - previousScale) > SCALE_EPSILON;
-
-    const scaleIsDefault = Math.abs(appliedScale - 1) < SCALE_EPSILON;
-
-    if (scaleChanged) {
-      if (scaleIsDefault) {
-        panel.style.removeProperty("--panel-scale");
-      } else {
-        panel.style.setProperty("--panel-scale", `${appliedScale}`);
-      }
-    } else if (scaleIsDefault) {
-      panel.style.removeProperty("--panel-scale");
-    }
-
-    const panelHeight = Number(panel.offsetHeight);
-    const scaledHeight =
-      Number.isFinite(panelHeight) && panelHeight > 0 ? panelHeight : 0;
-    const heightChanged = Math.abs(scaledHeight - lastScaledHeight) > 0.5;
-    lastScaledHeight = scaledHeight;
-
-    const isPortrait = isPortraitMode();
-    const portraitChanged = isPortrait !== lastIsPortrait;
-    lastIsPortrait = isPortrait;
-    if (portraitChanged) {
-      refresh(true);
-    }
-
-    return scaleChanged || heightChanged || portraitChanged;
-  }
-
-    function getScaledHeight() {
-      const panelHeight = Number(panel.offsetHeight);
-      if (!Number.isFinite(panelHeight) || panelHeight <= 0) {
-        return 0;
-      }
-      return panelHeight;
-    }
-
-  function refresh(force = false) {
-    multiplierBox.refresh(force);
-    rollModeBox.refresh(force);
-    winChanceBox.refresh(force);
-  }
-
-  const handleSliderChange = () => {
-    refresh();
-    if (layout()) {
-      sliderUi.layout();
-    }
-  };
-
-  setHandleSliderChange(handleSliderChange);
-
-  refresh(true);
-  layout();
-
-  const handlePortraitModeChange = () => {
-    const layoutChanged = layout();
-    if (!layoutChanged) {
-      refresh(true);
-    }
-    sliderUi.layout();
-  };
-
-  if (portraitMediaQuery) {
-    if (typeof portraitMediaQuery.addEventListener === "function") {
-      portraitMediaQuery.addEventListener("change", handlePortraitModeChange);
-      removePortraitModeWatcher = () =>
-        portraitMediaQuery.removeEventListener("change", handlePortraitModeChange);
-    } else if (typeof portraitMediaQuery.addListener === "function") {
-      portraitMediaQuery.addListener(handlePortraitModeChange);
-      removePortraitModeWatcher = () =>
-        portraitMediaQuery.removeListener(handlePortraitModeChange);
-    }
-  }
-
-  function setMultiplierClickable(isClickable) {
-    multiplierBox?.setClickable?.(isClickable);
-  }
-
-  function setRollModeClickable(isClickable) {
-    rollModeBox?.setClickable?.(isClickable);
-  }
-
-  function setWinChanceClickable(isClickable) {
-    winChanceBox?.setClickable?.(isClickable);
-  }
+  onValuesChange({ ...state });
 
   function setControlsClickable(isClickable) {
-    multiplierBox?.setClickable?.(isClickable);
-    rollModeBox?.setClickable?.(isClickable);
-    winChanceBox?.setClickable?.(isClickable);
+    targetBox.setClickable(isClickable);
+    winChanceBox.setClickable(isClickable);
+  }
+
+  function isValid() {
+    return (
+      !validateTarget(state.targetMultiplier) && !validateWinChance(state.winChance)
+    );
+  }
+
+  function showValidationMessage() {
+    const targetError = validateTarget(state.targetMultiplier);
+    const winChanceError = validateWinChance(state.winChance);
+    setInvalidState({ target: targetError, winChance: winChanceError });
+  }
+
+  function destroy() {
+    panel.remove();
   }
 
   return {
     panel,
-    refresh,
-    layout,
-    getScaledHeight,
-    setMultiplierClickable,
-    setRollModeClickable,
-    setWinChanceClickable,
+    getTargetMultiplier: () => state.targetMultiplier,
+    getWinChance: () => state.winChance,
     setControlsClickable,
-    destroy: () => {
-      setHandleSliderChange(() => {});
-      panel.style.removeProperty("--panel-scale");
-      panel.style.removeProperty("--panel-width-factor");
-      appliedScale = 1;
-      lastScaledHeight = 0;
-      removePortraitModeWatcher?.();
-      panel.remove();
-    },
+    isValid,
+    showValidationMessage,
+    destroy,
   };
 }
