@@ -1,4 +1,5 @@
 import { Stepper } from "../stepper/stepper.js";
+import { createTooltip } from "../tooltip/tooltip.js";
 import bitcoinIconUrl from "../../assets/sprites/controlPanel/BitCoin.svg";
 import infinityIconUrl from "../../assets/sprites/controlPanel/Infinity.svg";
 import percentageIconUrl from "../../assets/sprites/controlPanel/Percentage.svg";
@@ -63,8 +64,6 @@ export class ControlPanel extends EventTarget {
     this.showDummyServerButtonLocked = false;
 
     this.totalProfitMultiplier = 1;
-
-    this.betTooltipTimeout = null;
 
     const totalTilesOption = Number(this.options.totalTiles);
     const normalizedTotalTiles =
@@ -200,11 +199,11 @@ export class ControlPanel extends EventTarget {
     });
     this.betInputWrapper.appendChild(this.betStepper.element);
 
-    this.betTooltip = document.createElement("div");
-    this.betTooltip.className = "control-bet-tooltip";
-    this.betTooltip.setAttribute("role", "alert");
-    this.betTooltip.textContent = "This must be greater than or equal to 0";
-    this.betBox.appendChild(this.betTooltip);
+    this.betTooltip = createTooltip({
+      className: "control-bet-tooltip",
+      defaultMessage: "This must be greater than or equal to 0",
+    });
+    this.betBox.appendChild(this.betTooltip.element);
 
     this.halfButton = document.createElement("button");
     this.halfButton.type = "button";
@@ -1087,18 +1086,7 @@ export class ControlPanel extends EventTarget {
   }
 
   showBetAmountTooltip(message = "This must be greater than or equal to 0") {
-    if (!this.betTooltip) {
-      return;
-    }
-    this.betTooltip.textContent = message;
-    this.betTooltip.classList.add("is-visible");
-    if (this.betTooltipTimeout) {
-      clearTimeout(this.betTooltipTimeout);
-    }
-    this.betTooltipTimeout = setTimeout(() => {
-      this.betTooltip?.classList.remove("is-visible");
-      this.betTooltipTimeout = null;
-    }, 3000);
+    this.betTooltip?.show?.(message);
   }
 
   setBetInputValue(value, { emit = true } = {}) {
