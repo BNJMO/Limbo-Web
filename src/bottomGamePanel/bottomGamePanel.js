@@ -38,6 +38,20 @@ function sanitizeNumericInput(rawValue) {
   return sanitized;
 }
 
+function sanitizeWinChanceInput(rawValue) {
+  const sanitized = sanitizeNumericInput(rawValue);
+  const dotIndex = typeof sanitized === "string" ? sanitized.indexOf(".") : -1;
+
+  if (dotIndex === -1 || typeof sanitized !== "string") {
+    return sanitized;
+  }
+
+  const before = sanitized.slice(0, dotIndex + 1);
+  const after = sanitized.slice(dotIndex + 1).slice(0, 8);
+
+  return `${before}${after}`;
+}
+
 function roundToDecimals(value, decimals) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -251,7 +265,7 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
   ) {
     if (isSyncing && !allowSync) return;
 
-    const numeric = Number(sanitizeNumericInput(`${rawValue ?? ""}`));
+    const numeric = Number(sanitizeWinChanceInput(`${rawValue ?? ""}`));
     const rounded = Number.isFinite(numeric) ? roundToDecimals(numeric, 8) : NaN;
 
     if (!Number.isFinite(rounded)) {
@@ -319,7 +333,7 @@ export function createBottomGamePanel({ root, onValuesChange = () => {} } = {}) 
     icon: winChanceIconUrl,
     step: 0.01,
     format: formatWinChance,
-    sanitize: (value) => sanitizeNumericInput(`${value ?? ""}`),
+    sanitize: (value) => sanitizeWinChanceInput(`${value ?? ""}`),
     ariaLabel: "Win Chance",
     onCommit: handleWinChanceCommit,
     iconClass: "game-panel-icon--win-chance",
