@@ -6,6 +6,15 @@ const MIN_DISPLAY_MULTIPLIER = 1;
 const MAX_MULTIPLIER = 1_000_000;
 const HOUSE_EDGE = 0.99;
 
+function getRendererResolution() {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+
+  const dpr = window.devicePixelRatio ?? 1;
+  return Math.max(1, dpr);
+}
+
 function resolveRoot(mount) {
   const root = typeof mount === "string" ? document.querySelector(mount) : mount;
   if (!root) {
@@ -48,6 +57,7 @@ export async function createGame(mount, opts = {}) {
     width: startWidth,
     height: startHeight,
     antialias: true,
+    resolution: getRendererResolution(),
     autoDensity: true,
   });
 
@@ -157,6 +167,8 @@ export async function createGame(mount, opts = {}) {
     state.roundActive = true;
     state.betAmount = Number(amount) || 0;
     state.result = null;
+
+    setOutcomeDisplay(1);
 
     const resultMultiplier = generateDemoMultiplier();
     await animateToMultiplier(resultMultiplier);
