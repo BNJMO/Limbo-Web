@@ -1,6 +1,12 @@
 import { createGame } from "./game/game.js";
 import { ControlPanel } from "./controlPanel/controlPanel.js";
 import { createBottomGamePanel } from "./bottomGamePanel/bottomGamePanel.js";
+import {
+  loadGameSounds,
+  playBetButtonSound,
+  playLostSound,
+  playWinSound,
+} from "./sound/soundManager.js";
 
 let game;
 let controlPanel;
@@ -44,6 +50,7 @@ function resetRoundState() {
 }
 
 async function handleBetButtonClick() {
+  playBetButtonSound();
   const betAmount = controlPanel?.getBetValue?.() ?? 0;
 
   if (roundActive) return;
@@ -72,6 +79,11 @@ async function handleBetButtonClick() {
       label: formatMultiplierLabel(result),
       isWin,
     });
+    if (isWin) {
+      playWinSound();
+    } else {
+      playLostSound();
+    }
   } finally {
     roundActive = false;
     controlPanel?.setBetButtonState?.("clickable");
@@ -99,6 +111,8 @@ function bindControlPanelEvents() {
 }
 
 (async () => {
+  loadGameSounds();
+
   controlPanel = new ControlPanel("#control-panel", {
     gameName: "Limbo",
     minesLabel: "Options Input",
