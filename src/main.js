@@ -1,8 +1,10 @@
 import { createGame } from "./game/game.js";
 import { ControlPanel } from "./controlPanel/controlPanel.js";
+import { createBottomGamePanel } from "./bottomGamePanel/bottomGamePanel.js";
 
 let game;
 let controlPanel;
+let bottomPanel;
 let roundActive = false;
 
 function formatCurrency(value) {
@@ -12,16 +14,26 @@ function formatCurrency(value) {
 }
 
 function syncDisplays({ betAmount = 0, profitAmount = 0, multiplier = 1 }) {
+  const targetMultiplier = bottomPanel?.getTargetMultiplier?.() ?? 1;
+  const potentialProfit = betAmount * Math.max(0, targetMultiplier - 1);
   controlPanel?.setBetAmountDisplay?.(formatCurrency(betAmount));
-  controlPanel?.setProfitOnWinDisplay?.(formatCurrency(profitAmount));
+  controlPanel?.setProfitOnWinDisplay?.(formatCurrency(potentialProfit));
   controlPanel?.setTotalProfitMultiplier?.(multiplier);
-  controlPanel?.setProfitValue?.(profitAmount.toFixed(8));
+  const displayedProfit = Number.isFinite(profitAmount)
+    ? profitAmount
+    : potentialProfit;
+  controlPanel?.setProfitValue?.(displayedProfit.toFixed(8));
 }
 
 function resetRoundState() {
   roundActive = false;
   controlPanel?.setBetButtonState?.("clickable");
-  syncDisplays({ betAmount: controlPanel?.getBetValue?.() ?? 0, profitAmount: 0, multiplier: 1 });
+  bottomPanel?.setControlsClickable?.(true);
+  syncDisplays({
+    betAmount: controlPanel?.getBetValue?.() ?? 0,
+    profitAmount: 0,
+    multiplier: 1,
+  });
   game?.reset?.();
 }
 
@@ -30,15 +42,28 @@ async function handleBetButtonClick() {
 
   if (roundActive) return;
 
+  if (!bottomPanel?.isValid?.()) {
+    bottomPanel?.showValidationMessage?.();
+    return;
+  }
+
   roundActive = true;
   controlPanel?.setBetButtonState?.("non-clickable");
-  syncDisplays({ betAmount, profitAmount: betAmount, multiplier: 1 });
+  bottomPanel?.setControlsClickable?.(false);
+  syncDisplays({ betAmount, profitAmount: 0, multiplier: 1 });
 
   try {
-    await game?.playDemoRound?.({ amount: betAmount });
+    const result = await game?.playDemoRound?.({ amount: betAmount });
+    const targetMultiplier = bottomPanel?.getTargetMultiplier?.() ?? 1;
+    const isWin = Number(result) >= targetMultiplier;
+    const netProfit = isWin
+      ? betAmount * Math.max(0, targetMultiplier - 1)
+      : -betAmount;
+    syncDisplays({ betAmount, profitAmount: netProfit, multiplier: targetMultiplier });
   } finally {
     roundActive = false;
     controlPanel?.setBetButtonState?.("clickable");
+    bottomPanel?.setControlsClickable?.(true);
   }
 }
 
@@ -74,10 +99,24 @@ function bindControlPanelEvents() {
   });
 
   bindControlPanelEvents();
-  syncDisplays({ betAmount: controlPanel.getBetValue?.() ?? 0, profitAmount: 0, multiplier: 1 });
+  syncDisplays({
+    betAmount: controlPanel.getBetValue?.() ?? 0,
+    profitAmount: 0,
+    multiplier: 1,
+  });
 
   game = await createGame("#game", {});
   game?.setAnimationsEnabled?.(controlPanel.getAnimationsEnabled?.());
+
+  bottomPanel = createBottomGamePanel({
+    root: "#game",
+    onValuesChange: () => {
+      const betAmount = controlPanel?.getBetValue?.() ?? 0;
+      if (!roundActive) {
+        syncDisplays({ betAmount, profitAmount: 0, multiplier: 1 });
+      }
+    },
+  });
 
   resetRoundState();
 })();
