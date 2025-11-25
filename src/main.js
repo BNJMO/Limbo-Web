@@ -13,6 +13,12 @@ function formatCurrency(value) {
   return `$${normalized.toFixed(2)}`;
 }
 
+function formatMultiplierLabel(value) {
+  const numeric = Number(value);
+  const normalized = Number.isFinite(numeric) ? numeric : 0;
+  return `${normalized.toFixed(2)}x`;
+}
+
 function syncDisplays({ betAmount = 0, profitAmount = 0, multiplier = 1 }) {
   const targetMultiplier = bottomPanel?.getTargetMultiplier?.() ?? 1;
   const potentialProfit = betAmount * Math.max(0, targetMultiplier - 1);
@@ -62,6 +68,10 @@ async function handleBetButtonClick() {
       ? betAmount * Math.max(0, targetMultiplier - 1)
       : -betAmount;
     syncDisplays({ betAmount, profitAmount: netProfit, multiplier: targetMultiplier });
+    game?.addBetHistoryEntry?.({
+      label: formatMultiplierLabel(result),
+      isWin,
+    });
   } finally {
     roundActive = false;
     controlPanel?.setBetButtonState?.("clickable");

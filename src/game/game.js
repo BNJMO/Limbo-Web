@@ -1,4 +1,5 @@
 import { Application, Container, Text, TextStyle } from "pixi.js";
+import { createBetHistory } from "../betHistory/betHistory.js";
 
 const DEFAULT_BACKGROUND = 0x091b26;
 const MIN_MULTIPLIER = 1.01;
@@ -66,6 +67,7 @@ export async function createGame(mount, opts = {}) {
   root.appendChild(app.canvas);
 
   const stage = new Container();
+  stage.sortableChildren = true;
   app.stage.addChild(stage);
 
   const outcomeText = new Text({
@@ -83,6 +85,10 @@ export async function createGame(mount, opts = {}) {
   });
   outcomeText.anchor.set(0.5);
   stage.addChild(outcomeText);
+
+  const betHistory = createBetHistory({ app, cssRoot: root });
+  betHistory.container.zIndex = 200;
+  stage.addChild(betHistory.container);
 
   const state = {
     roundActive: false,
@@ -155,6 +161,7 @@ export async function createGame(mount, opts = {}) {
     const { width, height } = measureRootSize(root, initialSize);
     app.renderer.resize(width, height);
     outcomeText.position.set(width / 2, height / 2);
+    betHistory.layout({ animate: false });
   }
 
   function reset() {
@@ -187,13 +194,19 @@ export async function createGame(mount, opts = {}) {
 
   function setAnimationsEnabled(enabled) {
     app.ticker.stop();
+    betHistory.setAnimationsEnabled(enabled !== false);
     if (enabled !== false) {
       app.ticker.start();
     }
   }
 
+  function addBetHistoryEntry({ label, isWin }) {
+    betHistory.addEntry({ label, isWin });
+  }
+
   function destroy() {
     window.removeEventListener("resize", layout);
+    betHistory.destroy();
     app.destroy(true);
     if (app.canvas?.parentNode === root) {
       root.removeChild(app.canvas);
@@ -210,6 +223,7 @@ export async function createGame(mount, opts = {}) {
     playDemoRound,
     setAnimationsEnabled,
     setOutcomeColor,
+    addBetHistoryEntry,
     getState: () => ({ ...state }),
   };
 }
