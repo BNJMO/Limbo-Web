@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
-  base: '/Limbo-Demo/',
+  base: '/Limbo-Web/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
