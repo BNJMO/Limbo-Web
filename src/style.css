@@ -1,9 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap");
 @import "./game/gameStyle.css";
-@import "./controlPanel/controlPanelStyle.css";
 @import "./bottomGamePanel/bottomGamePanelStyles.css";
+@import "./controlPanel/controlPanelStyle.css";
 @import "./betHistory/betHistoryStyle.css";
-@import "./tooltip/tooltipStyles.css";
 @import "./stepper/stepperStyle.css";
 @import "./server/serverStyles.css";
 
