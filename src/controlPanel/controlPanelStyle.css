@@ -763,6 +763,7 @@
 @media (max-width: 768px), (orientation: portrait) {
   .control-panel {
     max-width: none;
+    order: 1;
   }
 
   .control-mode-section--manual {

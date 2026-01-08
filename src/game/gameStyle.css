@@ -52,7 +52,7 @@
 
 @media (max-width: 768px), (orientation: portrait) {
   .game-container {
-    order: 1;
+    order: 0;
     padding-top: 0px;
     min-height: 430px;
     max-height: 380px;
