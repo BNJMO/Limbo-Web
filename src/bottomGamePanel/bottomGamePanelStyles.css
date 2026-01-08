@@ -1,14 +1,16 @@
 .game-bottom-panel {
   position: absolute;
   bottom: 15px;
+  left: 15px;
+  right: 15px;
   transform-origin: bottom center;
   display: flex;
   flex-wrap: nowrap;
   gap: 16px;
   justify-content: center;
   padding: 16px 20px 24px;
-  width: calc(100% - 30px);
-  max-width: calc(100% - 0px);
+  width: auto;
+  max-width: none;
   min-width: 0;
   background: #182934;
   border-radius: 18px;
@@ -171,7 +173,7 @@ button.game-panel-value:focus-visible {
 }
 
 @media (orientation: portrait) {
-    .game-bottom-panel {
+  .game-bottom-panel {
     gap: 12px;
     padding: 22px 14px;
     bottom: 14px;
@@ -180,5 +182,63 @@ button.game-panel-value:focus-visible {
 
   .game-panel-item {
     min-width: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-bottom-panel {
+    gap: 8px;
+    padding: 16px 12px;
+    left: 10px;
+    right: 10px;
+  }
+
+  .game-panel-item {
+    min-width: 80px;
+    flex: 1 1 80px;
+  }
+
+  .game-panel-label {
+    font-size: 0.8rem;
+  }
+
+  .game-panel-value {
+    padding: 10px 0px 12px 6px;
+    font-size: 0.9rem;
+  }
+
+  .game-panel-icon {
+    right: 12px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .game-bottom-panel {
+    gap: 6px;
+    padding: 14px 10px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .game-panel-item {
+    min-width: 70px;
+    flex: 1 1 70px;
+  }
+
+  .game-panel-label {
+    font-size: 0.75rem;
+  }
+
+  .game-panel-value {
+    padding: 8px 0px 10px 6px;
+    font-size: 0.85rem;
+  }
+
+  .game-panel-icon {
+    right: 10px;
+    width: 14px;
+    height: 14px;
   }
 }
