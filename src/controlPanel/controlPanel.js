@@ -57,7 +57,7 @@ export class ControlPanel extends EventTarget {
     this.betButtonMode = "bet";
     this.betButtonState = "clickable";
     this.minesSelectState = "clickable";
-    this.autoStartButtonState = "non-clickable";
+    this.autoStartButtonState = "clickable";
     this.autoStartButtonMode = "start";
     this.showDummyServerPanelVisible = false;
     this.showDummyServerButtonLocked = false;
