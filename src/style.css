@@ -32,7 +32,6 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--app-body-vertical-padding) clamp(16px, 4vw, 24px);
 }
 
 .app-wrapper {
@@ -47,7 +46,6 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 1280px;
   min-height: 100%;
   height: min(
     100%,
@@ -60,7 +58,6 @@ body {
   display: flex;
   gap: 16px;
   background: #142733;
-  border-radius: 28px;
   border: 1px solid #223845;
   padding: 16px;
   padding-right: 8px;
