@@ -12,6 +12,9 @@ let game;
 let controlPanel;
 let bottomPanel;
 let roundActive = false;
+let autobetActive = false;
+let autobetStopRequested = false;
+const AUTOBET_DELAY_MS = 1000;
 
 function formatCurrency(value) {
   const numeric = Number(value);
@@ -49,16 +52,21 @@ function resetRoundState() {
   game?.reset?.();
 }
 
-async function handleBetButtonClick() {
-  playBetButtonSound();
-  const betAmount = controlPanel?.getBetValue?.() ?? 0;
+const wait = (duration) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
 
-  if (roundActive) return;
+async function playRound() {
+  if (roundActive) return false;
 
   if (!bottomPanel?.isValid?.()) {
     bottomPanel?.showValidationMessage?.();
-    return;
+    return false;
   }
+
+  playBetButtonSound();
+  const betAmount = controlPanel?.getBetValue?.() ?? 0;
 
   roundActive = true;
   controlPanel?.setBetButtonState?.("non-clickable");
@@ -89,10 +97,67 @@ async function handleBetButtonClick() {
     controlPanel?.setBetButtonState?.("clickable");
     bottomPanel?.setControlsClickable?.(true);
   }
+  return true;
+}
+
+async function handleBetButtonClick() {
+  await playRound();
+}
+
+async function startAutobetLoop() {
+  autobetActive = true;
+  autobetStopRequested = false;
+  controlPanel?.setAutoStartButtonMode?.("finish");
+  controlPanel?.setAutoStartButtonState?.("clickable");
+
+  let remainingBets = controlPanel?.getNumberOfBetsValue?.() ?? 0;
+  const infiniteBets = remainingBets === 0;
+  let isFirstBet = true;
+
+  while (autobetActive && !autobetStopRequested) {
+    if (!isFirstBet) {
+      await wait(AUTOBET_DELAY_MS);
+      if (autobetStopRequested) {
+        break;
+      }
+    }
+
+    const started = await playRound();
+    if (!started) {
+      autobetStopRequested = true;
+      break;
+    }
+
+    if (!infiniteBets) {
+      remainingBets = Math.max(0, remainingBets - 1);
+      controlPanel?.setNumberOfBetsValue?.(remainingBets);
+      if (remainingBets === 0) {
+        autobetStopRequested = true;
+      }
+    }
+
+    isFirstBet = false;
+    if (autobetStopRequested) {
+      await wait(AUTOBET_DELAY_MS);
+      break;
+    }
+  }
+
+  autobetActive = false;
+  autobetStopRequested = false;
+  controlPanel?.setAutoStartButtonMode?.("start");
+  controlPanel?.setAutoStartButtonState?.("clickable");
 }
 
 function handleStartAutobetClick() {
-  console.debug("Auto bet toggle requested - no game logic implemented yet.");
+  if (autobetActive) {
+    autobetStopRequested = true;
+    controlPanel?.setAutoStartButtonState?.("non-clickable");
+    return;
+  }
+
+  if (roundActive) return;
+  startAutobetLoop();
 }
 
 function bindControlPanelEvents() {
