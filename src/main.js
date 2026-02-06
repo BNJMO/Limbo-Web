@@ -110,14 +110,36 @@ async function startAutobetLoop() {
   controlPanel?.setAutoStartButtonMode?.("finish");
   controlPanel?.setAutoStartButtonState?.("clickable");
 
+  let remainingBets = controlPanel?.getNumberOfBetsValue?.() ?? 0;
+  const infiniteBets = remainingBets === 0;
+  let isFirstBet = true;
+
   while (autobetActive && !autobetStopRequested) {
-    await wait(AUTOBET_DELAY_MS);
-    if (autobetStopRequested) {
-      break;
+    if (!isFirstBet) {
+      await wait(AUTOBET_DELAY_MS);
+      if (autobetStopRequested) {
+        break;
+      }
     }
+
     const started = await playRound();
     if (!started) {
       autobetStopRequested = true;
+      break;
+    }
+
+    if (!infiniteBets) {
+      remainingBets = Math.max(0, remainingBets - 1);
+      controlPanel?.setNumberOfBetsValue?.(remainingBets);
+      if (remainingBets === 0) {
+        autobetStopRequested = true;
+      }
+    }
+
+    isFirstBet = false;
+    if (autobetStopRequested) {
+      await wait(AUTOBET_DELAY_MS);
+      break;
     }
   }
 
